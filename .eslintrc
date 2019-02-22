@@ -1,0 +1,20 @@
+{
+    "parserOptions": {
+        "parser": "babel-eslint",
+        "sourceType": "module",
+        "allowImportExportEverywhere": true
+    },
+    "extends": [
+        "plugin:vue/recommended",
+        "plugin:vue/essential",
+        "@vue/airbnb"
+    ],
+    "rules": {
+        "vue/max-attributes-per-line": "off",
+        "no-new": "off",
+        "max-len": ["error", 200],
+        "indent": ["error", 4],
+        "no-console": "off",
+        "no-alert": "off"
+    }
+}
