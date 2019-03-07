@@ -2,49 +2,59 @@
   <div class="add_stuff">
     <Form inline>
       <FormItem>
-        <Select filterable placeholder="领料单位">
-          <Option v-for="item in cityList" :key="item.value" :value="item.value">
-            {{ item.label }}
-          </Option>
+        <Select v-model="form.department" filterable placeholder="领料单位"
+                remote :remote-method="fetchDepartmentList" :loading="loading1"
+        >
+          <Option v-for="(option, index) in departmentList"
+                  :key="index" :value="option.id"
+          >{{ option.name }}</Option>
         </Select>
       </FormItem>
       <FormItem>
-        <Select filterable placeholder="列账单位">
-          <Option v-for="item in cityList" :key="item.value" :value="item.value">
-            {{ item.label }}
-          </Option>
+        <Select v-model="form.accountDepartment" filterable placeholder="列账单位"
+                remote :remote-method="fetchDepartmentList" :loading="loading1"
+        >
+          <Option v-for="(option, index) in departmentList"
+                  :key="index" :value="option.id"
+          >{{ option.name }}</Option>
         </Select>
       </FormItem>
       <FormItem>
-        <Select filterable placeholder="会计科目">
-          <Option v-for="item in cityList" :key="item.value" :value="item.value">
-            {{ item.label }}
-          </Option>
+        <Select v-model="form.financialType" filterable placeholder="会计科目"
+                remote :remote-method="fetchFinancialTypeList" :loading="loading1"
+        >
+          <Option v-for="(option, index) in financialTypeList"
+                  :key="index" :value="option.name"
+          >{{ option.name }}</Option>
         </Select>
       </FormItem>
       <FormItem>
-        <DatePicker type="date" placeholder="日期" style="width: 200px" />
+        <DatePicker v-model="form.date" type="date" placeholder="日期" style="width: 200px" />
       </FormItem>
     </Form>
     <Table :columns="shopCart" :data="shopCartList" />
-    <div>
-      <Button type="primary" @click="handleSubmit('formInline')">
+    <div class="mr_t_20">
+      <Button type="primary" @click="handleSubmit">
         出库
       </Button>
-      <span>合计：200元</span>
+      <span class="mr_l_20">合计：200元</span>
     </div>
     <Divider orientation="center" />
     <div>
-      <Select v-model="stuff.name" style="width:200px" filterable placeholder="物品名称" @on-change="handleGetStuff">
-        <Option v-for="item in cityList" :key="item.value" :value="item.value">
-          {{ item.label }}
-        </Option>
+      <Select v-model="queryStuffName" style="width:200px" filterable placeholder="物品名称"
+              remote :remote-method="fetchStuffByName" :loading="loading1"
+      >
+        <Option v-for="(option, index) in stuffNameList" :key="index" :value="option.name">{{ option.name }}</Option>
       </Select>
-      <Button type="primary" @click="handleSubmit('formInline')">
+      <Button class="mr_l_20" type="primary" @click="handleGetStore">
         搜索库存
       </Button>
     </div>
-    <Table :columns="columns1" :data="stuffList" />
+    <Table class="mr_t_20" :columns="columns1" :data="stuffList" />
+    <Modal v-model="V_modal" :title="M_title" @on-ok="addToShopCartList" @on-cancel="cancel">
+      <span>加入数量：</span>
+      <InputNumber v-model="M_value" :max="M_max" :min="M_min" />
+    </Modal>
   </div>
 </template>
 
@@ -59,19 +69,25 @@ const Component = Vue.extend({
     components: {},
     data() {
         return {
-            data: [{
-                name: 'New York',
-                type: '盒',
-                num: 18,
-                price: 30,
+            loading1: false,
+            submitFlag: false,
+            form: {
+                department: '',
+                accountDepartment: '',
+                financialType: '',
+                date: '',
             },
-            {
-                name: 'Sydney',
-                type: '盒s',
-                num: 10,
-                price: 33,
-            },
-            ],
+            queryStuffName: '',
+            stuffNameList: [],
+            departmentList: [],
+            accountDepartmentList: [],
+            financialTypeList: [],
+            T_stuff: {},
+            M_title: '',
+            V_modal: false,
+            M_value: 1,
+            M_max: 1,
+            M_min: 0,
             shopCart: [{
                 title: '物品名称',
                 key: 'name',
@@ -83,39 +99,25 @@ const Component = Vue.extend({
             {
                 title: '数量',
                 key: 'number',
-                render: (h, params) => h('InputNumber', {
-                    props: {
-                        max: 10,
-                        min: 1,
-                        value: params.row.number,
-                    },
-                    on: {
-                        'on-change': (event) => {
-                            console.log(event);
-                            this.handleChangeCartNumber(params.row.id, event);
-                        },
-                    },
-                }),
             },
             {
                 title: '总价',
                 key: 'totalPrice',
             },
             {
-                title: 'Action',
+                title: '操作',
                 key: 'action',
                 width: 150,
                 align: 'center',
-                render: h => h('div', [
+                render: (h, params) => h('div', [
                     h(
                         'Button', {
                             props: {
                                 type: 'error',
-                                size: 'small',
                             },
                             on: {
                                 click: () => {
-                                    alert(1);
+                                    this.handleRemoveShopCartItem(params.row);
                                 },
                             },
                         },
@@ -124,59 +126,12 @@ const Component = Vue.extend({
                 ]),
             },
             ],
-            shopCartList: [{
-                id: 3,
-                name: '捆钞绳',
-                price: '3元/个',
-                number: '3',
-                totalPrice: '9',
-            },
-            {
-                id: 4,
-                name: '捆钞绳',
-                price: '2元/个',
-                number: '5',
-                totalPrice: '10',
-            },
-            {
-                id: 5,
-                name: '笔',
-                price: '13元/盒',
-                number: '1',
-                totalPrice: '13',
-            },
-            ],
             stuff: {
                 name: '',
                 type: '',
                 price: 0,
                 num: 0,
             },
-            cityList: [{
-                value: 'New York',
-                label: 'New York',
-            },
-            {
-                value: 'London',
-                label: 'London',
-            },
-            {
-                value: 'Sydney',
-                label: 'Sydney',
-            },
-            {
-                value: 'Ottawa',
-                label: 'Ottawa',
-            },
-            {
-                value: 'Paris',
-                label: 'Paris',
-            },
-            {
-                value: 'Canberra',
-                label: 'Canberra',
-            },
-            ],
             columns1: [{
                 title: '物品名称',
                 key: 'name',
@@ -187,31 +142,203 @@ const Component = Vue.extend({
             },
             {
                 title: '数量',
-                key: 'num',
+                key: 'showNum',
             },
             {
-                title: '价格',
+                title: '单价',
                 key: 'price',
             },
-            ],
-            stuffList: [{
-                name: 'John Brown',
-                type: '盒',
-                num: 18,
-                price: 30,
-            },
             {
-                name: 'Joe Black',
-                type: '捆',
-                num: 30,
-                price: 30,
+                title: '操作',
+                key: 'action',
+                width: 150,
+                align: 'center',
+                render: (h, params) => h('div', [
+                    h(
+                        'Button', {
+                            props: {
+                                type: 'primary',
+                            },
+                            on: {
+                                click: () => {
+                                    this.handleChangeCartNumber(params.row);
+                                },
+                            },
+                        },
+                        '加入清单',
+                    ),
+                ]),
             },
             ],
+            stuffList: [],
+            shopCartList: [],
         };
     },
+    mounted() {
+        this.$axios
+            .get('/stock/department', {
+                params: {
+                    query: '',
+                    page: 0,
+                    limit: 10,
+                },
+            })
+            .then((res) => {
+                console.log(res);
+                if (res.data.code === '2000') {
+                    this.stuffNameList = res.data.stuffList;
+                } else {
+                    alert('获取领料单位失败');
+                }
+            }).catch((err) => {
+                console.log(`请求失败：${err}`);
+            });
+    },
     methods: {
-        handleChangeCartNumber(id) {
-            console.log(id);
+        fetchFinancialTypeList(query) {
+            this.financialTypeList = [{ name: query, id: -2 }];
+            if (query === 'qqqqqqqq') {
+                this.loading1 = true;
+                this.$axios
+                    .get('/stock/financialType', {
+                        params: {
+                            query: encodeURIComponent(query),
+                            page: 0,
+                            limit: 10,
+                        },
+                    })
+                    .then((res) => {
+                        this.loading1 = false;
+                        if (res.data.code === '2000') {
+                            this.departmentList = res.data.departmentList;
+                        } else {
+                            alert('获取部门信息失败');
+                        }
+                    }).catch((err) => {
+                        this.loading1 = false;
+                        console.log(`请求失败：${err}`);
+                    });
+            }
+        },
+        fetchDepartmentList(query) {
+            if (query !== '') {
+                this.loading1 = true;
+                this.$axios
+                    .get('/stock/department', {
+                        params: {
+                            query: encodeURIComponent(query),
+                            page: 0,
+                            limit: 10,
+                        },
+                    })
+                    .then((res) => {
+                        this.loading1 = false;
+                        if (res.data.code === '2000') {
+                            this.departmentList = res.data.departmentList;
+                        } else {
+                            alert('获取部门信息失败');
+                        }
+                    }).catch((err) => {
+                        this.loading1 = false;
+                        console.log(`请求失败：${err}`);
+                    });
+            }
+        },
+        fetchStuffByName(query) {
+            if (query !== '') {
+                this.loading1 = true;
+                this.$axios
+                    .get('/stock/stuff', {
+                        params: {
+                            queryList: encodeURIComponent(JSON.stringify([{ name: 'name', value: query }])),
+                            page: 0,
+                            limit: 10,
+                        },
+                    })
+                    .then((res) => {
+                        this.loading1 = false;
+                        if (res.data.code === '2000') {
+                            this.stuffNameList = res.data.stuffList;
+                        } else {
+                            alert('获取物品信息失败');
+                        }
+                    }).catch((err) => {
+                        this.loading1 = false;
+                        console.log(`请求失败：${err}`);
+                    });
+            }
+        },
+        handleGetStore() {
+            this.loading1 = true;
+            this.$axios
+                .get('/stock/stuff', {
+                    params: {
+                        queryList: encodeURIComponent(JSON.stringify([{ name: 'name', value: this.queryStuffName }])),
+                        page: 0,
+                        limit: 10,
+                    },
+                })
+                .then((res) => {
+                    this.loading1 = false;
+                    if (res.data.code === '2000') {
+                        this.stuffList = [];
+                        for (let i = 0; i < res.data.stuffList.length; i++) {
+                            this.stuffList.push({
+                                id: res.data.stuffList[i].id,
+                                name: res.data.stuffList[i].name,
+                                type: res.data.stuffList[i].type || '个',
+                                num: Number(res.data.stuffList[i].amount),
+                                showNum: Number(res.data.stuffList[i].amount),
+                                price: Number(res.data.stuffList[i].unitPrice),
+                            });
+                        }
+                        this.resetStuffListNumber();
+                    } else {
+                        alert('获取物品信息失败');
+                    }
+                }).catch((err) => {
+                    this.loading1 = false;
+                    console.log(`请求失败：${err}`);
+                });
+        },
+        handleChangeCartNumber(stuff) {
+            this.T_stuff = stuff;
+            this.V_modal = true;
+            this.M_title = stuff.name;
+            this.M_max = stuff.showNum;
+        },
+        addToShopCartList() {
+            const tempStuff = this.shopCartList.filter(item => item.id === this.T_stuff.id);
+            if (tempStuff.length > 0) {
+                tempStuff[0].number += this.M_value;
+                tempStuff[0].totalPrice = tempStuff[0].number * this.T_stuff.price;
+            } else {
+                this.shopCartList.push({
+                    id: this.T_stuff.id,
+                    name: this.T_stuff.name,
+                    price: `${this.T_stuff.price}元/${this.T_stuff.type}`,
+                    number: this.M_value,
+                    totalPrice: this.M_value * this.T_stuff.price,
+                });
+            }
+            this.resetStuffListNumber();
+        },
+        handleRemoveShopCartItem(rows) {
+            console.log(rows);
+            this.shopCartList = this.shopCartList.filter(item => item.id !== rows.id);
+            this.resetStuffListNumber();
+        },
+        cancel() {
+        },
+        resetStuffListNumber() {
+            for (let i = 0; i < this.stuffList.length; i++) {
+                this.stuffList[i].showNum = this.stuffList[i].num;
+                for (let j = 0; j < this.shopCartList.length; j++) {
+                    if (this.stuffList[i].id === this.shopCartList[j].id) {
+                        this.stuffList[i].showNum = this.stuffList[i].num - this.shopCartList[j].number;
+                    }
+                }
+            }
         },
         handleGetStuff(v) {
             const res = this.data.filter(item => item.name === v);
@@ -223,7 +350,41 @@ const Component = Vue.extend({
             }
         },
         handleSubmit() {
-            alert(1);
+            if (this.shopCartList.length > 0 && this.submitFlag === false) {
+                this.submitFlag = true;
+                const tempStuffList = [];
+                for (let i = 0; i < this.shopCartList.length; i++) {
+                    tempStuffList.push({
+                        id: this.shopCartList[i].id,
+                        quantity: this.shopCartList[i].number,
+                    });
+                }
+                this.$axios
+                    .post('/stock/stuff', {
+                        action: 'remove',
+                        accountDepartmentId: this.form.accountDepartment,
+                        departmentId: this.form.department,
+                        financialType: this.form.financialType,
+                        date: this.form.date,
+                        stuffList: tempStuffList,
+                    })
+                    .then((res) => {
+                        this.submitFlag = false;
+                        console.log(res);
+                        if (res.data.code === '2000') {
+                            alert('出库成功');
+                            this.shopCartList = [];
+                            this.stuffList = [];
+                        } else {
+                            alert('出库失败');
+                        }
+                    }).catch((err) => {
+                        this.submitFlag = false;
+                        console.log(`请求失败：${err}`);
+                    });
+            } else {
+                alert('出库失败:不能提交空数据');
+            }
         },
         handleAddTable() {
             console.log(this.stuff);
@@ -243,5 +404,8 @@ export default Component;
 <style lang="less">
     .mr_t_20 {
         margin-top: 20px;
+    }
+    .mr_l_20 {
+        margin-left: 20px;
     }
 </style>

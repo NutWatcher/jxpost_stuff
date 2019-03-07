@@ -28,5 +28,15 @@ export default new Router({
         name: 'removestuff',
         component: () => import('./views/RemoveStuff.vue'),
     },
+    {
+        path: '/records',
+        name: 'records',
+        component: () => import('./views/Records.vue'),
+    },
+    {
+        path: '/reports',
+        name: 'reports',
+        component: () => import('./views/Reports.vue'),
+    },
     ],
 });
